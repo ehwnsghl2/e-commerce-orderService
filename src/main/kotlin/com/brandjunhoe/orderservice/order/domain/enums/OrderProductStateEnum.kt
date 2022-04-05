@@ -1,0 +1,20 @@
+package com.brandjunhoe.orderservice.order.domain.enums
+
+enum class OrderProductStateEnum {
+    PAYMENT_COMPLETE,
+    PRODUCT_READY,
+    PURCHASE_CONFIRM,
+    CANCEL_AFTER_PAYMENT,
+    ANCEL_BEFORE_ADMIN,
+    CANCEL_BEFORE_SYSTEM,
+    CANCEL_BEFORE_USER,
+    EXCHANGE_COMPLETE,
+    PAYMENT_READY,
+    RETURN_COMPLETE,
+    SHIPPING_READY,
+    SHIPPING,
+    SHIPPING_COMPLETE,
+    SHIPPING_HOLD
+}
+
+
