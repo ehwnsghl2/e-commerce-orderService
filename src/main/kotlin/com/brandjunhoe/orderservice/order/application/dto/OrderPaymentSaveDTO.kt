@@ -5,6 +5,6 @@ import javax.validation.constraints.NotBlank
 class OrderPaymentSaveDTO(
 
     @NotBlank
-    val paymentType: String
+    val paymentMethod: String
 
 )

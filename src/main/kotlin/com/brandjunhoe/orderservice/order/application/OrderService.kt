@@ -3,12 +3,18 @@ package com.brandjunhoe.orderservice.order.application
 import com.brandjunhoe.orderservice.client.ProductCustomClient
 import com.brandjunhoe.orderservice.client.UserCustomClient
 import com.brandjunhoe.orderservice.client.dto.ProductDTO
+import com.brandjunhoe.orderservice.common.exception.BadRequestException
+import com.brandjunhoe.orderservice.common.exception.DataNotFoundException
 import com.brandjunhoe.orderservice.common.generator.CodeGenerator
 import com.brandjunhoe.orderservice.order.application.dto.OrderProductDTO
 import com.brandjunhoe.orderservice.order.domain.*
 import com.brandjunhoe.orderservice.order.domain.enums.DeviceTypeEnum
 import com.brandjunhoe.orderservice.order.domain.enums.OrderProductStateEnum
+import com.brandjunhoe.orderservice.order.domain.event.MileageSaveEvent
+import com.brandjunhoe.orderservice.order.domain.event.PaymentSaveEvent
+import com.brandjunhoe.orderservice.order.domain.event.ShippingSaveEvent
 import com.brandjunhoe.orderservice.order.presentation.dto.ReqOrderSaveDTO
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
@@ -21,7 +27,8 @@ class OrderService(
     private val orderRepository: OrderRepository,
     private val orderCustomRepository: OrderCustomRepository,
     private val userCustomClient: UserCustomClient,
-    private val productCustomClient: ProductCustomClient
+    private val productCustomClient: ProductCustomClient,
+    private val eventPublisher: ApplicationEventPublisher
 ) {
 
 
@@ -59,27 +66,27 @@ class OrderService(
         val code = CodeGenerator.RANDOM("OC")
 
 
-        val orderProduct = products.map { product ->
+        val orderProduct = request.products.map { product ->
 
-            request.products.find { it.productCode == product.productCode }?.let {
-                val sellingPrice = product.sellingPrice.plus(product.itemAddPrice)
+            products.find { it.productCode == product.productCode }?.let {
+                val sellingPrice = it.sellingPrice.plus(it.itemAddPrice)
                 val discountPrice = rate(sellingPrice, user.grade.discountRate).unaryMinus()
 
                 OrderProduct(
                     OrderProductCode(CodeGenerator.RANDOM("OP")),
-                    product.productCode,
-                    product.itemCode,
-                    product.productName,
-                    product.optionName,
-                    product.optionValue,
+                    it.productCode,
+                    it.itemCode,
+                    it.productName,
+                    it.optionName,
+                    it.optionValue,
                     OrderProductStateEnum.PAYMENT_READY,
                     sellingPrice,
                     discountPrice,
-                    it.quantity,
+                    product.quantity,
                     sellingPrice.plus(discountPrice).toBigDecimal(),
                     rate(totalPrice, user.grade.mileageSaveRate)
                 )
-            }
+            } ?: throw DataNotFoundException("product not found")
 
 
         }
@@ -92,11 +99,28 @@ class OrderService(
 
         orderRepository.save(orders)
 
+        // 결제금액
+        val amount = totalPrice.minus(shippingPrice).toBigDecimal()
         // 결제
-
-        // 적립금 미 가용 처리
+        eventPublisher.publishEvent(PaymentSaveEvent(code, request.paymentMethod.paymentMethod, amount))
 
         // 배송
+        eventPublisher.publishEvent(
+            ShippingSaveEvent(
+                code,
+                request.shipping.receiver,
+                request.shipping.phone,
+                request.shipping.postCode,
+                request.shipping.address,
+                request.shipping.addressDetail
+            )
+        )
+
+        // 적립금 미 가용 처리
+        val list = orderProduct.map {
+            MileageSaveEvent(request.usrId, it.orderProductCode.orderProductCode, it.mileage)
+        }
+        eventPublisher.publishEvent(list)
 
 
         // 추후

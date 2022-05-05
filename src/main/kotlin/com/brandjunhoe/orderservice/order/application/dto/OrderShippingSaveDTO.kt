@@ -11,6 +11,9 @@ class OrderShippingSaveDTO(
     val phone: String,
 
     @NotBlank
+    val postCode: String,
+
+    @NotBlank
     val address: String,
 
     @NotBlank
