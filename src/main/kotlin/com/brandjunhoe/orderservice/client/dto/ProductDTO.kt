@@ -16,8 +16,6 @@ class ProductDTO(
 
     val itemAddPrice: Int,
 
-    val sellingPrice: Int,
-
-    val discountPrice: Int? = null
+    val sellingPrice: Int
 
 )

@@ -37,8 +37,11 @@ class OrderProduct(
     @Column(name = "state", columnDefinition = "enum", nullable = false)
     var state: OrderProductStateEnum,
 
-    @Column(name = "price", nullable = false)
-    val price: Int,
+    @Column(name = "selling_price", nullable = false)
+    val sellingPrice: Int,
+
+    @Column(name = "discount_price", nullable = false)
+    val discountPrice: Int,
 
     @Column(name = "quantity", nullable = false)
     val quantity: Int,
@@ -50,7 +53,7 @@ class OrderProduct(
     val mileage: Int,
 
     @Column(name = "purchase_confirm_date")
-    var purchaseConfirmDate: Date? = null,
+    var purchaseConfirmDate: Date = Date(),
 
     @Column(name = "memo")
     val memo: String? = null

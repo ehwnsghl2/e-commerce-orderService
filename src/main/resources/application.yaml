@@ -60,3 +60,8 @@ spring:
 logging:
   level:
     root: info
+
+policy:
+  shipping:
+    free-amount: 70000
+  purchase-mileage-rate: 3
