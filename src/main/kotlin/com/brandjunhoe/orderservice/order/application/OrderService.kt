@@ -6,6 +6,8 @@ import com.brandjunhoe.orderservice.client.dto.ProductDTO
 import com.brandjunhoe.orderservice.common.exception.BadRequestException
 import com.brandjunhoe.orderservice.common.exception.DataNotFoundException
 import com.brandjunhoe.orderservice.common.generator.CodeGenerator
+import com.brandjunhoe.orderservice.kafka.pub.enums.MileageStateNum
+import com.brandjunhoe.orderservice.kafka.pub.enums.MileageTypeEnum
 import com.brandjunhoe.orderservice.order.application.dto.OrderProductDTO
 import com.brandjunhoe.orderservice.order.domain.*
 import com.brandjunhoe.orderservice.order.domain.enums.DeviceTypeEnum
@@ -118,7 +120,14 @@ class OrderService(
 
         // 적립금 미 가용 처리
         val list = orderProduct.map {
-            MileageSaveEvent(request.usrId, it.orderProductCode.orderProductCode, it.mileage)
+            MileageSaveEvent(
+                request.usrId,
+                code,
+                it.orderProductCode.orderProductCode,
+                MileageTypeEnum.PRODUCT,
+                MileageStateNum.READY,
+                it.mileage
+            )
         }
         eventPublisher.publishEvent(list)
 
@@ -146,6 +155,28 @@ class OrderService(
 
 
     }
+
+    fun updateOrderProductPurchase(usrId: UUID, orderCode: String, orderProductCode: String) {
+
+        val orders = orderRepository.findByOrderCode(OrderCode(orderCode))
+            ?: throw DataNotFoundException("order not found")
+
+        orders.changeOrderProductPurchase(orderProductCode)
+
+        // 적립금 가용 처리
+
+        eventPublisher.publishEvent(
+            MileageSaveEvent(
+                usrId,
+                orderCode,
+                orderProductCode,
+                MileageTypeEnum.PRODUCT,
+                MileageStateNum.SAVE
+            )
+        )
+
+    }
+
 
     fun rate(target: Int, rate: Int): Int {
         return (rate / 100) * target

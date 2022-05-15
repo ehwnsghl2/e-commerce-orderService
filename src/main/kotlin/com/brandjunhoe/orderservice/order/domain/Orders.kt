@@ -1,6 +1,8 @@
 package com.brandjunhoe.orderservice.order.domain
 
 import com.brandjunhoe.orderservice.common.domain.DateDeleteColumnEntity
+import com.brandjunhoe.orderservice.common.exception.BadRequestException
+import com.brandjunhoe.orderservice.common.exception.DataNotFoundException
 import com.brandjunhoe.orderservice.order.domain.enums.DeviceTypeEnum
 import org.hibernate.annotations.Where
 import java.math.BigDecimal
@@ -45,8 +47,14 @@ class Orders(
 
     @OneToMany(fetch = FetchType.LAZY, cascade = [CascadeType.PERSIST])
     @JoinColumn(name = "orderCode", nullable = false)
-    val orderProducts: List<OrderProduct?>
+    val orderProducts: List<OrderProduct>
 
 ) : DateDeleteColumnEntity() {
+
+    fun changeOrderProductPurchase(orderProductCode: String) {
+        orderProducts.find { it.orderProductCode == OrderProductCode(orderProductCode) }
+            ?.also { it.changePurchase() } ?: throw DataNotFoundException("orderProduct not found")
+
+    }
 
 }

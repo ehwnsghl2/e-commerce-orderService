@@ -25,12 +25,27 @@ class OrderController(val orderService: OrderService) {
     }
 
     @GetMapping("/{usrId}")
-    fun findOrderProducts(@PathVariable @Valid @NotBlank usrId: UUID,
-                          pageReq: ReqPageDTO): CommonResponse<ResPageDTO<List<OrderProductDTO>>> {
+    fun findOrderProducts(
+        @PathVariable @Valid @NotBlank usrId: UUID,
+        pageReq: ReqPageDTO
+    ): CommonResponse<ResPageDTO<List<OrderProductDTO>>> {
         val result = orderService.findOrderProducts(usrId, pageReq.getPageable())
 
-        return CommonResponse(ResPageDTO(TotalPageDTO(result.number, result.totalPages, result.totalElements),
-            result.content))
+        return CommonResponse(
+            ResPageDTO(
+                TotalPageDTO(result.number, result.totalPages, result.totalElements),
+                result.content
+            )
+        )
+    }
+
+    @PostMapping("/{orderCode}/product-purchase/{orderProductCode}")
+    fun updatePurchaseOrderProduct(
+        @PathVariable @Valid @NotBlank orderCode: String,
+        @PathVariable @Valid @NotBlank orderProductCode: String
+    ): CommonResponse<Any> {
+        orderService.updateOrderProductPurchase(UUID.randomUUID()/*추후구현*/, orderCode, orderProductCode)
+        return CommonResponse()
     }
 
 }

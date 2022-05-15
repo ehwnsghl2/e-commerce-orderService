@@ -1,11 +1,15 @@
 package com.brandjunhoe.orderservice.order.domain.event
 
-import java.math.BigDecimal
+import com.brandjunhoe.orderservice.kafka.pub.enums.MileageStateNum
+import com.brandjunhoe.orderservice.kafka.pub.enums.MileageTypeEnum
 import java.util.*
 
 
 class MileageSaveEvent(
     val usrId: UUID,
+    val orderCode: String,
     val orderProductCode: String,
-    val amount: Int
+    val mileageType: MileageTypeEnum,
+    val mileageState: MileageStateNum,
+    val amount: Int? = null
 )

@@ -2,6 +2,7 @@ package com.brandjunhoe.orderservice.order.domain
 
 import com.brandjunhoe.orderservice.common.domain.DateColumnEntity
 import com.brandjunhoe.orderservice.common.domain.DateDeleteColumnEntity
+import com.brandjunhoe.orderservice.common.exception.BadRequestException
 import com.brandjunhoe.orderservice.order.domain.enums.DeviceTypeEnum
 import com.brandjunhoe.orderservice.order.domain.enums.OrderProductStateEnum
 import org.hibernate.annotations.GenericGenerator
@@ -60,7 +61,10 @@ class OrderProduct(
 
 ) : DateColumnEntity() {
 
-    fun updatePurchase() {
+    fun changePurchase() {
+        if (this.state != OrderProductStateEnum.SHIPPING_COMPLETE)
+            throw BadRequestException("shipping not complete")
+
         this.state = OrderProductStateEnum.PURCHASE_CONFIRM
         this.purchaseConfirmDate = Date()
     }
