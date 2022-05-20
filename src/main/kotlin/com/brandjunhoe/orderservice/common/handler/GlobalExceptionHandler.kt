@@ -73,7 +73,7 @@ class GlobalExceptionHandler {
             ErrorException.HttpRequestMethodNotSupportedException.name,
             ErrorException.IllegalArgumentException.name,
             ErrorException.FormValidationException.name,
-            // 잘못된 요청
+                // 잘못된 요청
             ErrorException.BadRequestException.name -> ErrorCode.BAD_REQUEST
             // 인증 실패
             ErrorException.AuthenticationException.name -> ErrorCode.UNAUTHORIZED
@@ -83,9 +83,7 @@ class GlobalExceptionHandler {
             else -> ErrorCode.INTERNAL_SERVER_ERROR
         }
 
-        println(e.message)
-
-        return CommonResponse(errorCode.code, e.message.toString()/*errorCode.message*/)
+        return CommonResponse(errorCode.status, errorCode.code,  errorCode.message)
 
     }
 

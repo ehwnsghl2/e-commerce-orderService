@@ -9,7 +9,7 @@ import javax.persistence.Temporal
 import javax.persistence.TemporalType
 
 @MappedSuperclass
-open class DateColumnEntity(
+class DateColumnEntity(
 
         @CreationTimestamp
         @Temporal(TemporalType.TIMESTAMP)

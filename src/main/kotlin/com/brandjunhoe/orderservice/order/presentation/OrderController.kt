@@ -14,7 +14,7 @@ import javax.validation.Valid
 import javax.validation.constraints.NotBlank
 
 @RestController
-@RequestMapping("/order")
+@RequestMapping("/v1/order")
 class OrderController(val orderService: OrderService) {
 
 

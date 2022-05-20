@@ -2,6 +2,7 @@ package com.brandjunhoe.orderservice.kafka.pub
 
 import com.brandjunhoe.orderservice.order.domain.event.MileageSaveEvent
 import com.brandjunhoe.orderservice.order.domain.event.PaymentSaveEvent
+import com.brandjunhoe.orderservice.order.domain.event.ProductItemQuantityUpdateEvent
 import com.brandjunhoe.orderservice.order.domain.event.ShippingSaveEvent
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -27,6 +28,7 @@ class KafkaProducer(
     private val TOPIC_PAYMENT_SAVE = "payment-save"
     private val TOPIC_SHIPPING_SAVE = "shipping-save"
     private val TOPIC_MILEAGE_SAVE = "mileage-save"
+    private val TOPIC_PRODUCT_ITEM_QUANTITY_UPDATE = "product-item-quantity-update"
 
     @EventListener
     @Async
@@ -40,15 +42,23 @@ class KafkaProducer(
     @Async
     @Order(2)
     @Throws(JsonProcessingException::class)
-    fun sendShippingSaveEvent(event: ShippingSaveEvent) {
-        sendMsg(TOPIC_SHIPPING_SAVE, event)
+    fun sendProductItemQuantityUpdate(event: ProductItemQuantityUpdateEvent) {
+        sendMsg(TOPIC_PRODUCT_ITEM_QUANTITY_UPDATE, event)
     }
 
     @EventListener
     @Async
     @Order(3)
     @Throws(JsonProcessingException::class)
-    fun sendShippingSaveEvent(event: List<MileageSaveEvent>) {
+    fun sendShippingSaveEvent(event: ShippingSaveEvent) {
+        sendMsg(TOPIC_SHIPPING_SAVE, event)
+    }
+
+    @EventListener
+    @Async
+    @Order(4)
+    @Throws(JsonProcessingException::class)
+    fun sendShippingSaveEvent(event: MileageSaveEvent) {
         sendMsg(TOPIC_MILEAGE_SAVE, event)
     }
 

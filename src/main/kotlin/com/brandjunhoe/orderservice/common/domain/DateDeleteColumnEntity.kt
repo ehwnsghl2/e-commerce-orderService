@@ -7,7 +7,7 @@ import javax.persistence.Temporal
 import javax.persistence.TemporalType
 
 @MappedSuperclass
-open class DateDeleteColumnEntity(
+class DateDeleteColumnEntity(
 
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "deldate")

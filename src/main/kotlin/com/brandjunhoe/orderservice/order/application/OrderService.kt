@@ -2,18 +2,18 @@ package com.brandjunhoe.orderservice.order.application
 
 import com.brandjunhoe.orderservice.client.ProductCustomClient
 import com.brandjunhoe.orderservice.client.UserCustomClient
-import com.brandjunhoe.orderservice.client.dto.ProductDTO
-import com.brandjunhoe.orderservice.common.exception.BadRequestException
 import com.brandjunhoe.orderservice.common.exception.DataNotFoundException
 import com.brandjunhoe.orderservice.common.generator.CodeGenerator
 import com.brandjunhoe.orderservice.kafka.pub.enums.MileageStateNum
 import com.brandjunhoe.orderservice.kafka.pub.enums.MileageTypeEnum
 import com.brandjunhoe.orderservice.order.application.dto.OrderProductDTO
+import com.brandjunhoe.orderservice.order.application.dto.ShippingRegionDTO
 import com.brandjunhoe.orderservice.order.domain.*
 import com.brandjunhoe.orderservice.order.domain.enums.DeviceTypeEnum
 import com.brandjunhoe.orderservice.order.domain.enums.OrderProductStateEnum
 import com.brandjunhoe.orderservice.order.domain.event.MileageSaveEvent
 import com.brandjunhoe.orderservice.order.domain.event.PaymentSaveEvent
+import com.brandjunhoe.orderservice.order.domain.event.ProductItemQuantityUpdateEvent
 import com.brandjunhoe.orderservice.order.domain.event.ShippingSaveEvent
 import com.brandjunhoe.orderservice.order.presentation.dto.ReqOrderSaveDTO
 import org.springframework.context.ApplicationEventPublisher
@@ -21,7 +21,6 @@ import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.math.BigDecimal
 import java.util.*
 
 @Service
@@ -61,10 +60,16 @@ class OrderService(
         val shippingPrice = if (totalPrice < freeAmount)
             basicShippingPrice else 0
 
-        // 지역 배송비 이후
+        // 지역 배송비 (우선 제주도만)
+        val shippingRegion = listOf(ShippingRegionDTO("제주도", 63000, 63644, 4000))
+        val shippingAddPrice =
+            shippingRegion.find { request.shipping.postCode.toInt() >= it.from && request.shipping.postCode.toInt() <= it.until }
+                ?.let {
+                    it.price
+                } ?: 0
 
 
-        // 주문서 생성
+        // 주문서 코드 생성
         val code = CodeGenerator.RANDOM("OC")
 
 
@@ -102,9 +107,21 @@ class OrderService(
         orderRepository.save(orders)
 
         // 결제금액
-        val amount = totalPrice.minus(shippingPrice).toBigDecimal()
+        val amount = totalPrice.minus(shippingPrice).minus(shippingAddPrice).toBigDecimal()
+
         // 결제
         eventPublisher.publishEvent(PaymentSaveEvent(code, request.paymentMethod.paymentMethod, amount))
+
+        // 재고
+        orderProduct.forEach {
+            eventPublisher.publishEvent(
+                ProductItemQuantityUpdateEvent(
+                    it.productCode,
+                    it.itemCode,
+                    it.quantity
+                )
+            )
+        }
 
         // 배송
         eventPublisher.publishEvent(
@@ -119,17 +136,18 @@ class OrderService(
         )
 
         // 적립금 미 가용 처리
-        val list = orderProduct.map {
-            MileageSaveEvent(
-                request.usrId,
-                code,
-                it.orderProductCode.orderProductCode,
-                MileageTypeEnum.PRODUCT,
-                MileageStateNum.READY,
-                it.mileage
+        orderProduct.forEach {
+            eventPublisher.publishEvent(
+                MileageSaveEvent(
+                    request.usrId,
+                    code,
+                    it.orderProductCode.orderProductCode,
+                    MileageTypeEnum.PRODUCT,
+                    MileageStateNum.READY,
+                    it.mileage
+                )
             )
         }
-        eventPublisher.publishEvent(list)
 
 
         // 추후

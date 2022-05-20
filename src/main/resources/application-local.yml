@@ -1,31 +1,7 @@
 spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/order?serverTimezone=Asia/Seoul&useSSL=false
-    username: root
-    password: junhoe
-
-eureka:
-  client:
-    enabled: off
-#
-#eureka:
-#  instance:
-#    # 서비스 이름 대신 IP 주소 등록
-#    prefer-ip-address: true
-#
-#  client:
-#    # 유레카 서버에 서비스 등록
-#    register-with-eureka: true
-#    # 레지스트리 정보를 로컬에 캐싱
-#    fetch-registry: true
-#    service-url:
-#      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
-#      healthcheck: # health check 허용
-#        enabled: true
-#    registry-fetch-interval-seconds: 5 # 서비스 목록 5초마다 캐싱(default : 30초)
-#    disable-delta: true # 캐싱할 때 변경된 부분만 업데이트(default : false)
-#    # 유레카 클라이언트 속성 변경 새로고침 비활성화
-#    # 새로 고침이 발생하면 클라이언트가 Eureka 서버에서 등록 취소되고 주어진 서비스의 모든 인스턴스를 사용할 수 없는 짧은 시간이 있을 수 있음
-#    # 이를 방지하는 한 가지 방법은 이 속성을 비활성화 하는 것임
-#    refresh:
-#      enable: false
+  cloud:
+    config:
+      profile: local
+      fail-fast: true
+  config:
+    import: optional:configserver:http://localhost:8888
