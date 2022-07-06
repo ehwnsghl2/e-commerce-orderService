@@ -1,7 +1,6 @@
 package com.brandjunhoe.orderservice.order.domain
 
 import com.brandjunhoe.orderservice.common.domain.DateDeleteColumnEntity
-import com.brandjunhoe.orderservice.common.exception.BadRequestException
 import com.brandjunhoe.orderservice.common.exception.DataNotFoundException
 import com.brandjunhoe.orderservice.order.domain.enums.DeviceTypeEnum
 import org.hibernate.annotations.Where
@@ -33,28 +32,31 @@ class Orders(
     @Column(name = "device_type", columnDefinition = "enum", nullable = false)
     var deviceType: DeviceTypeEnum,
 
-    @Column(name = "total_order_amount")
-    val totalOrderAmount: BigDecimal? = null,
-
-    @Column(name = "total_shipping_amount")
-    val totalShippingAmount: BigDecimal? = null,
-
-    @Column(name = "total_sale_amount")
-    val totalSaleAmount: BigDecimal? = null,
-
-    @Column(name = "total_payment_amount")
-    val totalPaymentAmount: BigDecimal? = null,
-
     @OneToMany(fetch = FetchType.LAZY, cascade = [CascadeType.PERSIST])
     @JoinColumn(name = "orderCode", nullable = false)
-    val orderProducts: List<OrderProduct>
+    val orderProduct: List<OrderProduct>
 
 ) : DateDeleteColumnEntity() {
 
-    fun changeOrderProductPurchase(orderProductCode: String) {
-        orderProducts.find { it.orderProductCode == OrderProductCode(orderProductCode) }
+    @Column(name = "total_order_amount")
+    var totalOrderAmount: BigDecimal? = null
+        protected set
+
+    @Column(name = "total_shipping_amount")
+    var totalShippingAmount: BigDecimal? = null
+        protected set
+
+    @Column(name = "total_sale_amount")
+    var totalSaleAmount: BigDecimal? = null
+        protected set
+
+    @Column(name = "total_payment_amount")
+    var totalPaymentAmount: BigDecimal? = null
+        protected set
+
+    fun changeOrderProductPurchase(orderProductCode: String): OrderProduct =
+        orderProduct.find { it.orderProductCode == OrderProductCode(orderProductCode) }
             ?.also { it.changePurchase() } ?: throw DataNotFoundException("orderProduct not found")
 
-    }
 
 }

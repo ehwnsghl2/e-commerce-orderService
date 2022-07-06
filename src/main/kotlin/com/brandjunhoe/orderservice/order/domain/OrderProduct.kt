@@ -48,7 +48,7 @@ class OrderProduct(
     val quantity: Int,
 
     @Column(name = "amount", nullable = false)
-    val amount: BigDecimal,
+    val amount: Int,
 
     @Column(name = "mileage", nullable = false)
     val mileage: Int,

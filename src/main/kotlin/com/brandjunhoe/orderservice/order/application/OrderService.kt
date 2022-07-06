@@ -3,14 +3,15 @@ package com.brandjunhoe.orderservice.order.application
 import com.brandjunhoe.orderservice.client.ProductCustomClient
 import com.brandjunhoe.orderservice.client.UserCustomClient
 import com.brandjunhoe.orderservice.common.exception.DataNotFoundException
-import com.brandjunhoe.orderservice.common.generator.CodeGenerator
-import com.brandjunhoe.orderservice.kafka.pub.enums.MileageStateNum
+import com.brandjunhoe.orderservice.kafka.pub.enums.MileageStateEnum
 import com.brandjunhoe.orderservice.kafka.pub.enums.MileageTypeEnum
 import com.brandjunhoe.orderservice.order.application.dto.OrderProductDTO
+import com.brandjunhoe.orderservice.order.application.dto.OrderShippingSaveDTO
 import com.brandjunhoe.orderservice.order.application.dto.ShippingRegionDTO
-import com.brandjunhoe.orderservice.order.domain.*
-import com.brandjunhoe.orderservice.order.domain.enums.DeviceTypeEnum
-import com.brandjunhoe.orderservice.order.domain.enums.OrderProductStateEnum
+import com.brandjunhoe.orderservice.order.domain.OrderCode
+import com.brandjunhoe.orderservice.order.domain.OrderCustomRepository
+import com.brandjunhoe.orderservice.order.domain.OrderProduct
+import com.brandjunhoe.orderservice.order.domain.OrderRepository
 import com.brandjunhoe.orderservice.order.domain.event.MileageSaveEvent
 import com.brandjunhoe.orderservice.order.domain.event.PaymentSaveEvent
 import com.brandjunhoe.orderservice.order.domain.event.ProductItemQuantityUpdateEvent
@@ -21,6 +22,7 @@ import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 import java.util.*
 
 @Service
@@ -38,116 +40,43 @@ class OrderService(
 
 
         // 상품
-        val products = productCustomClient.findProduct(
-            request.products.map { it.productCode }
-        )
-
+        val products = productCustomClient.findProduct(request.products.map { it.productCode })
 
         // 할인 (상품 할인, 등급 할인)
         val user = userCustomClient.findUser(request.usrId)
 
-        val freeAmount = 70000
-        val basicShippingPrice = 3000
+        // 주문서 생성
+        val orders = orderRepository.save(request.toEntity(user, products))
 
-        val sellingPrice = products.sumOf { it.sellingPrice.plus(it.itemAddPrice) }
+        // 총 상품가
+        val sellingPrice = orders.orderProduct.sumOf { it.amount }
 
-        val discountPrice = rate(sellingPrice, user.grade.discountRate).unaryMinus()
+        // 총 할인가
+        val discountPrice = orders.orderProduct.sumOf { it.discountPrice }
 
+        // 상품 할인가
         val totalPrice = sellingPrice.plus(discountPrice)
 
-        // 배송 정책 (무배 금액 기준)
         // 기본 배송비
-        val shippingPrice = if (totalPrice < freeAmount)
-            basicShippingPrice else 0
+        val shippingPrice = getShippingPrice(totalPrice)
 
-        // 지역 배송비 (우선 제주도만)
-        val shippingRegion = listOf(ShippingRegionDTO("제주도", 63000, 63644, 4000))
-        val shippingAddPrice =
-            shippingRegion.find { request.shipping.postCode.toInt() >= it.from && request.shipping.postCode.toInt() <= it.until }
-                ?.let {
-                    it.price
-                } ?: 0
+        // 지역 배송비
+        val shippingAddPrice = getShippingAddPrice(request.shipping.postCode)
 
-
-        // 주문서 코드 생성
-        val code = CodeGenerator.RANDOM("OC")
-
-
-        val orderProduct = request.products.map { product ->
-
-            products.find { it.productCode == product.productCode }?.let {
-                val sellingPrice = it.sellingPrice.plus(it.itemAddPrice)
-                val discountPrice = rate(sellingPrice, user.grade.discountRate).unaryMinus()
-
-                OrderProduct(
-                    OrderProductCode(CodeGenerator.RANDOM("OP")),
-                    it.productCode,
-                    it.itemCode,
-                    it.productName,
-                    it.optionName,
-                    it.optionValue,
-                    OrderProductStateEnum.PAYMENT_READY,
-                    sellingPrice,
-                    discountPrice,
-                    product.quantity,
-                    sellingPrice.plus(discountPrice).toBigDecimal(),
-                    rate(totalPrice, user.grade.mileageSaveRate)
-                )
-            } ?: throw DataNotFoundException("product not found")
-
-
-        }
-
-        val orders = Orders(
-            OrderCode(code), request.usrId, user.name, user.email, request.shipping.phone,
-            DeviceTypeEnum.PC,
-            orderProducts = orderProduct
-        )
-
-        orderRepository.save(orders)
-
-        // 결제금액
-        val amount = totalPrice.minus(shippingPrice).minus(shippingAddPrice).toBigDecimal()
+        // 결제 금액
+        val amount = paymentAmount(totalPrice, shippingPrice, shippingAddPrice)
 
         // 결제
-        eventPublisher.publishEvent(PaymentSaveEvent(code, request.paymentMethod.paymentMethod, amount))
+        paymentSaveEvent(orders.orderCode, request.payment.paymentMethod, amount.toBigDecimal())
 
         // 재고
-        orderProduct.forEach {
-            eventPublisher.publishEvent(
-                ProductItemQuantityUpdateEvent(
-                    it.productCode,
-                    it.itemCode,
-                    it.quantity
-                )
-            )
-        }
+        stockQuantityEvent(orders.orderProduct)
 
         // 배송
-        eventPublisher.publishEvent(
-            ShippingSaveEvent(
-                code,
-                request.shipping.receiver,
-                request.shipping.phone,
-                request.shipping.postCode,
-                request.shipping.address,
-                request.shipping.addressDetail
-            )
-        )
+        shippingSaveEvent(orders.orderCode, request.shipping)
 
         // 적립금 미 가용 처리
-        orderProduct.forEach {
-            eventPublisher.publishEvent(
-                MileageSaveEvent(
-                    request.usrId,
-                    code,
-                    it.orderProductCode.orderProductCode,
-                    MileageTypeEnum.PRODUCT,
-                    MileageStateNum.READY,
-                    it.mileage
-                )
-            )
-        }
+        mileageSaveEvent(request.usrId, orders.orderCode, MileageTypeEnum.PRODUCT, MileageStateEnum.READY, orders.orderProduct)
 
 
         // 추후
@@ -168,7 +97,6 @@ class OrderService(
             }
         }
 
-
         return result
 
 
@@ -179,25 +107,75 @@ class OrderService(
         val orders = orderRepository.findByOrderCode(OrderCode(orderCode))
             ?: throw DataNotFoundException("order not found")
 
-        orders.changeOrderProductPurchase(orderProductCode)
+        val orderProduct = orders.changeOrderProductPurchase(orderProductCode)
 
         // 적립금 가용 처리
-
-        eventPublisher.publishEvent(
-            MileageSaveEvent(
-                usrId,
-                orderCode,
-                orderProductCode,
-                MileageTypeEnum.PRODUCT,
-                MileageStateNum.SAVE
-            )
-        )
+        mileageSaveEvent(usrId, orders.orderCode, MileageTypeEnum.PRODUCT, MileageStateEnum.SAVE, listOf(orderProduct))
 
     }
 
+    private fun getShippingPrice(totalPrice: Int): Int {
+        val freeAmount = 70000
+        val basicShippingPrice = 3000
+        return if (totalPrice < freeAmount)
+            basicShippingPrice else 0
+    }
 
-    fun rate(target: Int, rate: Int): Int {
-        return (rate / 100) * target
+    private fun getShippingAddPrice(postCode: String): Int {
+        // 지역 배송비 (우선 제주도만)
+        val shippingRegion = listOf(ShippingRegionDTO("제주도", 63000, 63644, 4000))
+        val shippingAddPrice =
+            shippingRegion.find { postCode.toInt() >= it.from && postCode.toInt() <= it.until }
+                ?.let { it.price } ?: 0
+        return shippingAddPrice
+    }
+
+    private fun paymentAmount(totalPrice: Int, shippingPrice: Int, shippingAddPrice: Int): Int =
+        totalPrice.minus(shippingPrice).minus(shippingAddPrice)
+
+
+    private fun paymentSaveEvent(orderCode: OrderCode, paymentMethod: String, amount: BigDecimal) {
+        eventPublisher.publishEvent(PaymentSaveEvent(orderCode.orderCode, paymentMethod, amount))
+    }
+
+    private fun stockQuantityEvent(orderProduct: List<OrderProduct>) {
+        orderProduct.forEach {
+            eventPublisher.publishEvent(ProductItemQuantityUpdateEvent(it.productCode, it.itemCode, it.quantity))
+        }
+    }
+
+    private fun shippingSaveEvent(orderCode: OrderCode, shipping: OrderShippingSaveDTO) {
+        eventPublisher.publishEvent(
+            ShippingSaveEvent(
+                orderCode.orderCode,
+                shipping.receiver,
+                shipping.phone,
+                shipping.postCode,
+                shipping.address,
+                shipping.addressDetail
+            )
+        )
+    }
+
+    private fun mileageSaveEvent(
+        usrId: UUID,
+        orderCode: OrderCode,
+        mileageType: MileageTypeEnum,
+        mileageState: MileageStateEnum,
+        orderProduct: List<OrderProduct>
+    ) {
+        orderProduct.forEach {
+            eventPublisher.publishEvent(
+                MileageSaveEvent(
+                    usrId,
+                    orderCode.orderCode,
+                    it.orderProductCode.orderProductCode,
+                    mileageType,
+                    mileageState,
+                    it.mileage
+                )
+            )
+        }
     }
 
 }
