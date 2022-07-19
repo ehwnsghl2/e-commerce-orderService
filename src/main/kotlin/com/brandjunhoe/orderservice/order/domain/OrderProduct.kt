@@ -61,6 +61,9 @@ class OrderProduct(
 
 ) : DateColumnEntity() {
 
+    @Version
+    var version: Long? = null
+
     fun changePurchase() {
         if (this.state != OrderProductStateEnum.SHIPPING_COMPLETE)
             throw BadRequestException("shipping not complete")

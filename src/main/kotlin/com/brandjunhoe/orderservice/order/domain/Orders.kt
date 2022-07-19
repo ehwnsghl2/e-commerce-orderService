@@ -30,13 +30,17 @@ class Orders(
 
     @Enumerated(EnumType.STRING)
     @Column(name = "device_type", columnDefinition = "enum", nullable = false)
-    var deviceType: DeviceTypeEnum,
+    val deviceType: DeviceTypeEnum,
 
     @OneToMany(fetch = FetchType.LAZY, cascade = [CascadeType.PERSIST])
     @JoinColumn(name = "orderCode", nullable = false)
     val orderProduct: List<OrderProduct>
 
+
 ) : DateDeleteColumnEntity() {
+
+    @Version
+    val version: Long? = null
 
     @Column(name = "total_order_amount")
     var totalOrderAmount: BigDecimal? = null
