@@ -42,22 +42,6 @@ class Orders(
     @Version
     val version: Long? = null
 
-    @Column(name = "total_order_amount")
-    var totalOrderAmount: BigDecimal? = null
-        protected set
-
-    @Column(name = "total_shipping_amount")
-    var totalShippingAmount: BigDecimal? = null
-        protected set
-
-    @Column(name = "total_sale_amount")
-    var totalSaleAmount: BigDecimal? = null
-        protected set
-
-    @Column(name = "total_payment_amount")
-    var totalPaymentAmount: BigDecimal? = null
-        protected set
-
     fun changeOrderProductPurchase(orderProductCode: String): OrderProduct =
         orderProduct.find { it.orderProductCode == OrderProductCode(orderProductCode) }
             ?.also { it.changePurchase() } ?: throw DataNotFoundException("orderProduct not found")
